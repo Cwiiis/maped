@@ -1139,7 +1139,7 @@ class ImportDialog(simpledialog.Dialog):
         }
         self.destroy()
 
-def validate_png(read, mode, tile_width, tile_height):
+def validate_png(read, scanlines, mode, tile_width, tile_height):
     width = read[0]
     height = read[1]
     info = read[3]
@@ -1152,8 +1152,12 @@ def validate_png(read, mode, tile_width, tile_height):
 
     palette = info['palette']
     if len(palette) > max_colours:
-        messagebox.showerror('Import error', 'PNG contains too many colours for mode %d (%d > 16)' % (options['mode'], len(palette)))
-        return False
+        # Check if any of the extra colours are referenced
+        for line in scanlines:
+            for col in range(0, width):
+                if line[col] >= max_colours:
+                    messagebox.showerror('Import error', 'PNG contains too many colours for mode %d (%d > 16)' % (mode, len(palette)))
+                    return False
     
     if width % tile_width != 0 or height % tile_height != 0:
         messagebox.showerror('Import error', 'Invalid tile size of %dx%d for image size of %dx%d' %
@@ -1173,19 +1177,19 @@ def import_file(root):
         return
 
     input = png.Reader(filename=filename).read()
-    if not validate_png(input, options['mode'], options['tile_width'], options['tile_height']):
+    scanlines = list(input[2])
+    if not validate_png(input, scanlines, options['mode'], options['tile_width'], options['tile_height']):
         return
-    
-    # Validation success, actually import map
-    width = input[0]
-    height = input[1]
-    reader = input[2]
-    info = input[3]
-    palette = info['palette']
     
     max_colours = 16 if options['mode'] == 0 else (4 if options['mode'] == 1 else 2)
     pixels_per_byte = 2 if options['mode'] == 0 else (4 if options['mode'] == 1 else 8)
 
+    # Validation success, actually import map
+    width = input[0]
+    height = input[1]
+    info = input[3]
+    palette = info['palette'][0:max_colours]
+    
     ctx.name = None
     ctx.mode = options['mode']
     ctx.tile_width = options['tile_width']
@@ -1202,7 +1206,6 @@ def import_file(root):
     ctx.tiles = collections.OrderedDict()
     ctx.map = []
 
-    scanlines = list(reader)
     for col in range(0, width, ctx.tile_width):
         for row in range(0, height, ctx.tile_height):
             tile = []
