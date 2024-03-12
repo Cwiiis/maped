@@ -14,6 +14,7 @@ import pathlib
 import png
 import platform
 import re
+import struct
 import zipfile
 
 TAG_PALETTE = ['#edd400', '#f57900', '#c17d11', '#73d216',
@@ -351,7 +352,7 @@ def canvas_release(e):
 
 def canvas_press(e):
     ctx.canvas.focus_set()
-    
+
     # If we've clicked an entity, select it (should we disable selection when this happens?)
     (x, y) = map_coords_from_event(e)
     i = entity_at_point(x, y)
@@ -1337,20 +1338,67 @@ def export_binaries(root):
     if options is None:
         return
     
+    filetypes = [('BIN files', '*.bin')]
+    
     if options['export_map']:
         if ctx.width == 0 or ctx.height == 0:
             messagebox.showerror('Export binaries', 'Map is incomplete')
         else:
-            filetypes = [('BIN files', '*.bin')]
-            filename = filedialog.asksaveasfilename(title='Save As...', filetypes=filetypes, defaultextension='bin')
-            if filename == '':
-                return
-            if pathlib.Path(filename).suffix != '.bin':
-                filename = filename + '.bin'
-            with open(filename, 'wb') as file:
-                for i in range(ctx.width * ctx.height):
-                    idx = ((i % ctx.height) * ctx.width + (i // ctx.width)) if options['row_major'] else i
-                    file.write(ctx.map[idx].to_bytes(1, 'little'))
+            filename = filedialog.asksaveasfilename(title='Save map binary', filetypes=filetypes, defaultextension='bin')
+            if filename != '':
+                with open(filename, 'wb') as file:
+                    for i in range(ctx.width * ctx.height):
+                        idx = ((i % ctx.height) * ctx.width + (i // ctx.width)) if options['row_major'] else i
+                        file.write(ctx.map[idx].to_bytes(1, 'little'))
+    
+    if options['export_tiles']:
+        if len(ctx.tiles) < 1:
+            messagebox.showinfo('Export binaries', 'No tiles to export')
+        else:
+            filename = filedialog.asksaveasfilename(title='Save tiles binary', filetypes=filetypes, defaultextension='bin')
+            if filename != '':
+                with open(filename, 'wb') as file:
+                    for tile in ctx.tiles:
+                        file.write(tile)
+    
+    if options['export_entities']:
+        if len(ctx.entities) < 1:
+            messagebox.showinfo('Export binaries', 'No entities to export')
+        else:
+            filename = filedialog.asksaveasfilename(title='Save entities binary', filetypes=filetypes, defaultextension='bin')
+            if filename != '':
+                with open(filename, 'wb') as file:
+                    for e in ctx.entities:
+                        file.write(struct.pack('<H', e[0])) # x
+                        file.write(struct.pack('<H', e[1])) # y
+                        for d in e[3]: # data
+                            file.write(d[0].to_bytes(1, 'little'))
+    
+    if options['export_data']:
+        data = []
+        for datum in ctx.data_tree.get_children():
+            data.append(ctx.data_tree.item(datum)['values'])
+        if len(data) < 1:
+            messagebox.showinfo('Export binaries', 'No data to export')
+        else:
+            filename = filedialog.asksaveasfilename(title='Save data binary', filetypes=filetypes, defaultextension='bin')
+            if filename != '':
+                with open(filename, 'wb') as file:
+                    for d in data:
+                        file.write(int(d[0]).to_bytes(1, 'little')) # id
+                        file.write(int(d[1]).to_bytes(1, 'little')) # value
+    
+    if options['export_palette']:
+        if len(ctx.palette) < 1:
+            messagebox.showinfo('Export binaries', 'No palette to export')
+        else:
+            filename = filedialog.asksaveasfilename(title='Save palette binary', filetypes=filetypes, defaultextension='bin')
+            if filename != '':
+                with open(filename, 'wb') as file:
+                    for c in ctx.palette:
+                        # TODO: Offer more colour formats than just 12-bit Plus colours
+                        colour = int(c[3] + c[1] + c[5], 16)
+                        file.write(struct.pack('<H', colour))
 
 def export_image(root):
     if len(ctx.tiles) < 1 or ctx.width == 0 or ctx.height == 0:
