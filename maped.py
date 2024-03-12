@@ -350,6 +350,8 @@ def canvas_release(e):
         ctx.selection[1][1] = y2
 
 def canvas_press(e):
+    ctx.canvas.focus_set()
+    
     # If we've clicked an entity, select it (should we disable selection when this happens?)
     (x, y) = map_coords_from_event(e)
     i = entity_at_point(x, y)
@@ -405,6 +407,23 @@ def canvas_left(e):
         canvas.unbind_all("<Button-5>")
     else:
         canvas.unbind_all("<MouseWheel>")
+
+def canvas_scroll(root, x, y):
+    if entry_has_focus(root):
+        return
+    
+    xview = ctx.canvas.xview()
+    yview = ctx.canvas.yview()
+
+    if x < 0 and xview[0] > 0.0:
+        ctx.canvas.xview_moveto(max(0, xview[0] - 1.0/ctx.width))
+    elif x > 0 and xview[1] < 1.0:
+        ctx.canvas.xview_moveto(min(1.0 - (xview[1] - xview[0]), xview[0] + 1.0/ctx.width))
+
+    if y < 0 and yview[0] > 0.0:
+        ctx.canvas.yview_moveto(max(0, yview[0] - 1.0/ctx.height))
+    elif y > 0 and yview[1] < 1.0:
+        ctx.canvas.yview_moveto(min(1.0 - (yview[1] - yview[0]), yview[0] + 1.0/ctx.height))
 
 def tiles_canvas_clicked(e):
     if ctx.selection is None:
@@ -1629,6 +1648,11 @@ def main():
     ctx.canvas.bind('<ButtonRelease-1>', canvas_release)
     ctx.canvas.bind('<Enter>', canvas_entered)
     ctx.canvas.bind('<Leave>', canvas_left)
+
+    root.bind('<Left>', lambda e: canvas_scroll(root, -1, 0))
+    root.bind('<Right>', lambda e: canvas_scroll(root, 1, 0))
+    root.bind('<Up>', lambda e: canvas_scroll(root, 0, -1))
+    root.bind('<Down>', lambda e: canvas_scroll(root, 0, 1))
 
     # Create tiles canvas
     ctx.tiles_canvas = Canvas(tiles_panel, width=0, height=0, bg='white', borderwidth=0, highlightthickness=0)
