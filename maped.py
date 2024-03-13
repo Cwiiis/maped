@@ -1539,7 +1539,7 @@ def main():
     root.bind('<Control-i>', lambda e: import_file(root))
     root.bind('<Control-I>', lambda e: import_tiles(root))
     root.bind('<Control-minus>', lambda e: adjust_zoom(-1))
-    root.bind('<Control-=>', lambda e: adjust_zoom(1))
+    root.bind('<Control-equal>', lambda e: adjust_zoom(1))
     root.bind('<Control-0>', lambda e: adjust_zoom(-10))
     root.bind('<Control-q>', lambda e: root.destroy())
     root.bind('<Control-n>', lambda e: new_file(root))
