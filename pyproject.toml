@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "maped"
+version = "0.1.0"
+description = "Amstrad CPC (Plus/GX4000) tile map editor"
+authors = ["Your Name <you@example.com>"]
+license = "GPL-3.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pypng = "^0.20220715.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
