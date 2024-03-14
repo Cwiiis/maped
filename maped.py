@@ -1218,7 +1218,7 @@ def import_file(root):
     ctx.height = int(height / options['tile_height'])
 
     # Convert colours to hex codes
-    ctx.palette = ['#%02x%02x%02x' % c for c in palette]
+    ctx.palette = ['#%02x%02x%02x' % c[0:3] for c in palette]
     for __unused_color__ in range(len(palette), max_colours):
         ctx.palette.append('#000000')
 
