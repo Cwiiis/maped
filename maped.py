@@ -1296,26 +1296,28 @@ class ExportBinaryDialog(simpledialog.Dialog):
 
     def export_map_cb(self):
         for radio in self.map_radios:
-            radio.configure(state=NORMAL if self.export_map.get() == 1 else DISABLED)
+            radio.configure(state=NORMAL if self.export_map.get() == 1 or self.export_tags.get() == 1 else DISABLED)
 
     def body(self, master):
         master.pack(expand=True, fill=BOTH)
 
         self.export_map = IntVar()
         ttk.Checkbutton(master, text='Export map', variable=self.export_map, command=self.export_map_cb).grid(row=0, column=0, sticky=W)
+        self.export_tags = IntVar()
+        ttk.Checkbutton(master, text='Export tags', variable=self.export_tags, command=self.export_map_cb).grid(row=1, column=0, sticky=W)
         self.is_row_major = IntVar()
         self.map_radios = [Radiobutton(master, text='Column-major', value=0, variable=self.is_row_major, state=DISABLED)]
-        self.map_radios[0].grid(row=1, column=0, sticky=W)
+        self.map_radios[0].grid(row=2, column=0, sticky=W)
         self.map_radios.append(Radiobutton(master, text='Row-major', value=1, variable=self.is_row_major, state=DISABLED))
-        self.map_radios[1].grid(row=2, column=0, sticky=W)
+        self.map_radios[1].grid(row=3, column=0, sticky=W)
         self.export_tiles = IntVar()
-        ttk.Checkbutton(master, text='Export tiles', variable=self.export_tiles).grid(row=3, column=0, sticky=W)
+        ttk.Checkbutton(master, text='Export tiles', variable=self.export_tiles).grid(row=4, column=0, sticky=W)
         self.export_entities = IntVar()
-        ttk.Checkbutton(master, text='Export entities', variable=self.export_entities).grid(row=4, column=0, sticky=W)
+        ttk.Checkbutton(master, text='Export entities', variable=self.export_entities).grid(row=5, column=0, sticky=W)
         self.export_data = IntVar()
-        ttk.Checkbutton(master, text='Export data', variable=self.export_data).grid(row=5, column=0, sticky=W)
+        ttk.Checkbutton(master, text='Export data', variable=self.export_data).grid(row=6, column=0, sticky=W)
         self.export_palette = IntVar()
-        ttk.Checkbutton(master, text='Export palette', variable=self.export_palette).grid(row=6, column=0, sticky=W)
+        ttk.Checkbutton(master, text='Export palette', variable=self.export_palette).grid(row=7, column=0, sticky=W)
     
     def buttonbox(self):
         ttk.Button(self, text='OK', width=6, command=self.ok_pressed).pack(side=RIGHT, padx=5, pady=5)
@@ -1325,6 +1327,7 @@ class ExportBinaryDialog(simpledialog.Dialog):
     def ok_pressed(self):
         self.result = {
             'export_map': self.export_map.get() == 1,
+            'export_tags': self.export_tags.get() == 1,
             'row_major': self.is_row_major.get() == 1,
             'export_tiles': self.export_tiles.get() == 1,
             'export_entities': self.export_entities.get() == 1,
@@ -1350,6 +1353,17 @@ def export_binaries(root):
                     for i in range(ctx.width * ctx.height):
                         idx = ((i % ctx.height) * ctx.width + (i // ctx.width)) if options['row_major'] else i
                         file.write(ctx.map[idx].to_bytes(1, 'little'))
+    
+    if options['export_tags']:
+        if ctx.width == 0 or ctx.height == 0:
+            messagebox.showerror('Export binaries', 'Map is incomplete')
+        else:
+            filename = filedialog.asksaveasfilename(title='Save map tags binary', filetypes=filetypes, defaultextension='bin')
+            if filename != '':
+                with open(filename, 'wb') as file:
+                    for i in range(ctx.width * ctx.height):
+                        idx = ((i % ctx.height) * ctx.width + (i // ctx.width)) if options['row_major'] else i
+                        file.write(ctx.tags[idx].to_bytes(1, 'little'))
     
     if options['export_tiles']:
         if len(ctx.tiles) < 1:
