@@ -8,7 +8,9 @@ Amstrad CPC (Plus/GX4000) tile map editor
 
 ## Install and usage
 
-`maped` uses [poetry](https://python-poetry.org). Making use of `maped` requires `poetry` to be [installed in your system](https://python-poetry.org/docs/#installation). Once available, use the following commands:
+`maped` depends on Python 3, [pytk](https://docs.python.org/3/library/tk.html) (distributed with Python by default on Windows and Mac) and [pypng](https://gitlab.com/drj11/pypng). `pypng` can be installed using `pip`, by running `pip install --user pypng`.
+
+Alternatively, you can run and install `maped` dependencies via [poetry](https://python-poetry.org). You need to have `poetry` [installed in your system](https://python-poetry.org/docs/#installation). Once available, use the following commands:
 
 ```bash
 # Setup a virtual environment for maped.
