@@ -2,7 +2,7 @@
 name = "maped"
 version = "0.1.0"
 description = "Amstrad CPC (Plus/GX4000) tile map editor"
-authors = ["Your Name <you@example.com>"]
+authors = ["Chris Lord <chrislord.net@gmail.com>"]
 license = "GPL-3.0"
 readme = "README.md"
 
