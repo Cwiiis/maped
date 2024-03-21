@@ -1176,7 +1176,7 @@ def validate_png(read, scanlines, mode, tile_width, tile_height):
         for line in scanlines:
             for col in range(0, width):
                 if line[col] >= max_colours:
-                    messagebox.showerror('Import error', 'PNG contains too many colours for mode %d (%d > 16)' % (mode, len(palette)))
+                    messagebox.showerror('Import error', 'PNG uses too many colours for mode %d (%d > 16, found index %d)' % (mode, len(palette), line[col]))
                     return False
     
     if width % tile_width != 0 or height % tile_height != 0:
@@ -1186,15 +1186,23 @@ def validate_png(read, scanlines, mode, tile_width, tile_height):
     
     return True
 
-def import_file(root):
+def import_file(root, replace=False):
     filetypes = [('PNG files', '*.png')]
     filename = filedialog.askopenfilename(title='Import map image', filetypes=filetypes)
     if filename == '':
         return
     
-    options = ImportDialog(root, 'Map properties').result
-    if options is None:
-        return
+    options = {}
+    if not replace:
+        options = ImportDialog(root, 'Map properties').result
+        if options is None:
+            return
+    else:
+        options = {
+            'mode': ctx.mode,
+            'tile_width': ctx.tile_width,
+            'tile_height': ctx.tile_height,
+        }
 
     input = png.Reader(filename=filename).read()
     scanlines = list(input[2])
@@ -1210,10 +1218,11 @@ def import_file(root):
     info = input[3]
     palette = info['palette'][0:max_colours]
     
-    ctx.name = None
-    ctx.mode = options['mode']
-    ctx.tile_width = options['tile_width']
-    ctx.tile_height = options['tile_height']
+    if not replace:
+        ctx.name = None
+        ctx.mode = options['mode']
+        ctx.tile_width = options['tile_width']
+        ctx.tile_height = options['tile_height']
     ctx.width = int(width / options['tile_width'])
     ctx.height = int(height / options['tile_height'])
 
@@ -1223,7 +1232,10 @@ def import_file(root):
         ctx.palette.append('#000000')
 
     # Build tile map and unique tiles list
-    ctx.tiles = collections.OrderedDict()
+    tiles = collections.OrderedDict()
+    if replace:
+        for i in range(len(ctx.tiles)):
+            tiles[ctx.tiles[i]] = i
     ctx.map = []
 
     for col in range(0, width, ctx.tile_width):
@@ -1233,19 +1245,21 @@ def import_file(root):
                 for offset in range(col, col+ctx.tile_width, pixels_per_byte):
                     tile.append(get_byte(scanline, offset, ctx.mode))
             tile = bytes(tile)
-            if tile in ctx.tiles:
-                ctx.map.append(ctx.tiles[tile])
+            if tile in tiles:
+                ctx.map.append(tiles[tile])
             else:
-                ctx.map.append(len(ctx.tiles))
-                ctx.tiles[tile] = len(ctx.tiles)
+                ctx.map.append(len(tiles))
+                tiles[tile] = len(tiles)
 
-    ctx.tiles = list(ctx.tiles.keys())
+    ctx.tiles = list(tiles.keys())
     ctx.tags = [0 for x in range(ctx.width * ctx.height)]
     ctx.notes = ['' for x in range(ctx.width * ctx.height)]
-    ctx.data_tree.delete(*ctx.data_tree.get_children())
-    ctx.entities = []
-    ctx.entity_tree.delete(*ctx.entity_tree.get_children())
-    ctx.entity_data_tree.delete(*ctx.entity_data_tree.get_children())
+
+    if not replace:
+        ctx.data_tree.delete(*ctx.data_tree.get_children())
+        ctx.entities = []
+        ctx.entity_tree.delete(*ctx.entity_tree.get_children())
+        ctx.entity_data_tree.delete(*ctx.entity_data_tree.get_children())
 
     refresh_ui()
 
@@ -1497,8 +1511,13 @@ def main():
     menu.add_command(label='Save As...', underline=5, accelerator='Ctrl+Shift+S', command=lambda : save_file(root, True))
     menu.add_command(label='Properties...', underline=0, accelerator='Ctrl+P', command=lambda: PropertiesDialog(root))
     menu.add_separator()
-    menu.add_command(label='Import...', underline=0, accelerator='Ctrl+I', command=lambda : import_file(root))
-    menu.add_command(label='Import tiles...', underline=7, accelerator='Ctrl+Shift+I', command=lambda : import_tiles(root))
+
+    # File->Import menu
+    import_menu = Menu(menu, tearoff=0)
+    import_menu.add_command(label='Import map...', underline=0, accelerator='Ctrl+I', command=lambda : import_file(root))
+    import_menu.add_command(label='Replace map...', underline=0, accelerator='Ctrl+R', command=lambda : import_file(root, True))
+    import_menu.add_command(label='Import tiles...', underline=7, accelerator='Ctrl+Shift+I', command=lambda : import_tiles(root))
+    menu.add_cascade(label='Import', underline=0, menu=import_menu)
 
     # File->Export menu
     export_menu = Menu(menu, tearoff=0)
@@ -1537,6 +1556,7 @@ def main():
     # Keyboard shortcuts
 
     root.bind('<Control-i>', lambda e: import_file(root))
+    root.bind('<Control-r>', lambda e: import_file(root, True))
     root.bind('<Control-I>', lambda e: import_tiles(root))
     root.bind('<Control-minus>', lambda e: adjust_zoom(-1))
     root.bind('<Control-equal>', lambda e: adjust_zoom(1))
