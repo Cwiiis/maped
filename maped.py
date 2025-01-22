@@ -1274,6 +1274,7 @@ def import_file(root, replace=False):
         ctx.mode = options['mode']
         ctx.tile_width = options['tile_width']
         ctx.tile_height = options['tile_height']
+    (old_width, old_height) = (ctx.width, ctx.height)
     ctx.width = int(width / options['tile_width'])
     ctx.height = int(height / options['tile_height'])
 
@@ -1303,8 +1304,18 @@ def import_file(root, replace=False):
                 tiles[tile] = len(tiles)
 
     ctx.tiles = list(tiles.keys())
-    ctx.tags = [0 for x in range(ctx.width * ctx.height)]
-    ctx.notes = ['' for x in range(ctx.width * ctx.height)]
+    new_tags = [0 for x in range(ctx.width * ctx.height)]
+    new_notes = ['' for x in range(ctx.width * ctx.height)]
+    if replace:
+        # Copy old tags into new tags
+        for y in range(0, min(old_height, ctx.height)):
+            for x in range(0, min(old_width, ctx.width)):
+                old_i = x * old_height + y
+                new_i = x * ctx.height + y
+                new_tags[new_i] = ctx.tags[old_i]
+                new_notes[new_i] = ctx.notes[old_i]
+    ctx.tags = new_tags
+    ctx.notes = new_notes
 
     if not replace:
         ctx.data_tree.delete(*ctx.data_tree.get_children())
