@@ -1332,12 +1332,12 @@ def import_tiles(root):
         return
 
     input = png.Reader(filename=filename).read()
-    if not validate_png(input, ctx.mode, ctx.tile_width, ctx.tile_height):
+    scanlines = list(input[2])
+    if not validate_png(input, scanlines, ctx.mode, ctx.tile_width, ctx.tile_height):
         return
 
     width = input[0]
     height = input[1]
-    reader = input[2]
     pixels_per_byte = 2 if ctx.mode == 0 else (4 if ctx.mode == 1 else 8)
 
     if len(ctx.tiles) == 0:
@@ -1348,16 +1348,28 @@ def import_tiles(root):
             ctx.palette.append('#000000')
 
     # Add new tiles (TODO: Share code with import_file)
-    scanlines = list(reader)
+    new_tiles = []
     for col in range(0, width, ctx.tile_width):
         for row in range(0, height, ctx.tile_height):
             tile = []
             for scanline in scanlines[row:row+ctx.tile_height]:
                 for offset in range(col, col+ctx.tile_width, pixels_per_byte):
                     tile.append(get_byte(scanline, offset, ctx.mode))
-            tile = bytes(tile)
-            if tile not in ctx.tiles:
-                ctx.tiles.append(tile)
+            new_tiles.append(bytes(tile))
+    
+    for i in range(len(ctx.tiles)):
+        tile = ctx.tiles[i]
+        new_i = 0
+        if tile in new_tiles:
+            new_i = new_tiles.index(tile)
+        else:
+            new_i = len(new_tiles)
+            new_tiles.append(tile)
+        for j in range(len(ctx.map)):
+            if ctx.map[j] == i:
+                ctx.map[j] = new_i
+    
+    ctx.tiles = new_tiles
     
     if len(ctx.map) != ctx.width * ctx.height:
         ctx.map = [0 for i in range(ctx.width * ctx.height)]
