@@ -51,7 +51,7 @@ class Ctx:
         self.note_text = None # The Text widget for cell notes
         self.set_cell_tag = None # Callback (tag, desc) to update the cell properties UI
         self.data_tree = None # Treeview containing cell data (id, data, desc)
-        self.entity_tree = None # Treeview containing entity list (x, y, desc)
+        self.entity_tree = None # Treeview containing entity list (type, tx, sx, ty, sy, desc)
         self.entity_data_tree = None # Treeview to show individual entity data (data)
         self.status_left = None # Status bar text variable
         self.status_right = None # Status bar text variable
@@ -68,7 +68,7 @@ class Ctx:
         self.tags = [] # Tile tags map
         self.notes = [] # Map of notes for cells in tile map
         self.entity_size = 4
-        self.entities = [] # Entity list (x, y, desc, [[data, desc]+])
+        self.entities = [] # Entity list (Type, Tile X, Scroll X, Tile Y, Scroll Y, desc, [[data, desc]+])
         self.palette = [] # Palette as hex values
         self.width = 0 # Map width in tiles
         self.height = 0 # Map height in tiles
@@ -98,7 +98,7 @@ class Ctx:
         self.entity_tree.delete(*self.entity_tree.get_children())
         self.entity_data_tree.delete(*self.entity_data_tree.get_children())
         for entity in self.entities:
-            self.entity_tree.insert('', END, values=(entity[0], entity[1], entity[2]))
+            self.entity_tree.insert('', END, values=tuple(entity[0:6]))
 
     def toJSON(self):
         return Ctx.__serialiser__(self).toJSON()
@@ -311,10 +311,20 @@ def map_coords_from_event(e):
     height_scale = (2 if ctx.mode == 2 else 1) * ctx.zoom
     return (int(x / width_scale), int(y / height_scale))
 
+def entity_coords_from_event(e):
+    (x, y) = map_coords_from_event(e)
+    tx = int(x / ctx.tile_width)
+    ty = int(y / ctx.tile_height)
+    sx = x % ctx.tile_width
+    sy = y % ctx.tile_height
+    return (tx, sx, ty, sy)
+
 def entity_at_point(x, y):
+    tx = int(x / ctx.tile_width)
+    ty = int(y / ctx.tile_height)
     for i in range(len(ctx.entities)):
-        if x > ctx.entities[i][0] - 4 and x < ctx.entities[i][0] + 4 and \
-           y > ctx.entities[i][1] - 4 and y < ctx.entities[i][1] + 4:
+        if tx == ctx.entities[i][1] and \
+           ty == ctx.entities[i][3]:
             return i
     return -1
 
@@ -330,7 +340,7 @@ def canvas_motion(e):
     if i == -1:
         ctx.status_right.set('(%d, %d)' % (x, y))
     else:
-        ctx.status_right.set('%s (%d, %d)' % (ctx.entities[i][2], x, y))
+        ctx.status_right.set('%s (%d, %d)' % (ctx.entities[i][5], x, y))
 
 def canvas_release(e):
     i = tile_coords_from_coords(e)
@@ -375,7 +385,8 @@ def canvas_alt_press(e, root):
     (x, y) = map_coords_from_event(e)
     i = entity_at_point(x, y)
     if i == -1:
-        add_entity(root, [x, y, ''])
+        (tx, sx, ty, sy) = entity_coords_from_event(e)
+        add_entity(root, [0, tx, sx, ty, sy, ''])
     else:
         ctx.entity_tree.selection_set(ctx.entity_tree.get_children()[i])
         edit_entity(root)
@@ -573,12 +584,12 @@ def edit_entity_data(root):
 
     for item in ctx.entity_data_tree.selection():
         j = ctx.entity_data_tree.index(item)
-        d = EntityDataDialog(root, ctx.entities[i][3][j]).result
+        d = EntityDataDialog(root, ctx.entities[i][6][j]).result
         if d is None:
             continue
-        ctx.entities[i][3][j][0] = d['data']
-        ctx.entities[i][3][j][1] = d['desc']
-        ctx.entity_data_tree.item(item, values=ctx.entities[i][3][j])
+        ctx.entities[i][6][j][0] = d['data']
+        ctx.entities[i][6][j][1] = d['desc']
+        ctx.entity_data_tree.item(item, values=ctx.entities[i][6][j])
 
 class EntityDataDialog(simpledialog.Dialog):
     def __init__(self, parent, data):
@@ -634,10 +645,13 @@ def edit_entity(root):
         d = EntityDialog(root, 'Edit entity', ctx.entities[i]).result
         if d is None:
             continue
-        ctx.entities[i][0] = d['x']
-        ctx.entities[i][1] = d['y']
-        ctx.entities[i][2] = d['desc']
-        ctx.entity_tree.item(item, values=ctx.entities[i][0:3])
+        ctx.entities[i][0] = d['type']
+        ctx.entities[i][1] = d['tx']
+        ctx.entities[i][2] = d['sx']
+        ctx.entities[i][3] = d['ty']
+        ctx.entities[i][4] = d['sy']
+        ctx.entities[i][5] = d['desc']
+        ctx.entity_tree.item(item, values=ctx.entities[i][0:6])
         changed = True
     if changed:
         redraw_entities()
@@ -649,7 +663,7 @@ def select_entity():
     ctx.entity_data_tree.delete(*ctx.entity_data_tree.get_children())
     i = ctx.entity_tree.index(selection[0])
 
-    for datum in ctx.entities[i][3]:
+    for datum in ctx.entities[i][6]:
         ctx.entity_data_tree.insert('', END, values=datum)
 
 def remove_entity():
@@ -662,30 +676,46 @@ def remove_entity():
 
 def add_entity(root, defaults=None):
     if defaults is None:
-        defaults = [0, 0, '']
+        defaults = [0, 0, 0, 0, 0, '']
         if ctx.selection is not None:
-            defaults[0] = int((ctx.selection[0][0] + ctx.selection[1][0] + 1) / 2 * ctx.tile_width)
-            defaults[1] = int((ctx.selection[0][1] + ctx.selection[1][1] + 1) / 2 * ctx.tile_height)
+            x = int((ctx.selection[0][0] + ctx.selection[1][0] + 1) / 2 * ctx.tile_width)
+            y = int((ctx.selection[0][1] + ctx.selection[1][1] + 1) / 2 * ctx.tile_height)
+            defaults[1] = int(x / ctx.tile_width)
+            defaults[2] = x % ctx.tile_width
+            defaults[3] = int(y / ctx.tile_height)
+            defaults[4] = y % ctx.tile_height
 
     d = EntityDialog(root, 'Add entity', defaults).result
     if d is None:
         return
     
-    entity = [d['x'], d['y'], d['desc'], [[0, ''] for x in range(ctx.entity_size)]]
+    entity = [d['type'], d['tx'], d['sx'], d['ty'], d['sy'], d['desc'], [[0, ''] for x in range(ctx.entity_size)]]
     if len(ctx.entities) > 0:
         for x in range(ctx.entity_size):
-            entity[3][x][1] = ctx.entities[-1][3][x][1]
+            entity[6][x][1] = ctx.entities[-1][6][x][1]
     ctx.entities.append(entity)
-    ctx.entity_tree.insert('', END, values=entity[0:3])
+    ctx.entity_tree.insert('', END, values=entity[0:6])
     redraw_entities()
 
 def validate_entity(data):
-    if data['x'] < 0 or data['x'] > 65535:
-        messagebox.showerror('Data error', 'Invalid X coordinate (must be between 0 and 65535)')
+    if data['type'] < 0 or data['type'] > 255:
+        messagebox.showerror('Data error', 'Invalid entity type (must be between 0 and 255)')
+        return False
+
+    if data['tx'] < 0 or data['tx'] > 255:
+        messagebox.showerror('Data error', 'Invalid X tile coordinate (must be between 0 and 255)')
         return False
     
-    if data['y'] < 0 or data['y'] > 65535:
-        messagebox.showerror('Data error', 'Invalid Y coordinate (must be between 0 and 65535)')
+    if data['sx'] < 0 or data['sx'] >= ctx.tile_width:
+        messagebox.showerror('Data error', 'Invalid X tile offset (must be positive and below tile width)')
+        return False
+    
+    if data['ty'] < 0 or data['ty'] > 255:
+        messagebox.showerror('Data error', 'Invalid Y tile coordinate (must be between 0 and 255)')
+        return False
+    
+    if data['sy'] < 0 or data['sy'] >= ctx.tile_height:
+        messagebox.showerror('Data error', 'Invalid Y tile offset (must be positive and below tile width)')
         return False
     
     return True
@@ -698,28 +728,46 @@ class EntityDialog(simpledialog.Dialog):
     def body(self, master):
         master.pack(expand=True, fill=BOTH, padx=5, pady=5)
 
-        ttk.Label(master, text='X').grid(row=0, column=0, sticky=W, padx=5, pady=5)
-        ttk.Label(master, text='Y').grid(row=1, column=0, sticky=W, padx=5, pady=5)
-        ttk.Label(master, text='Description').grid(row=2, column=0, sticky=W, padx=5, pady=5)
+        ttk.Label(master, text='Type').grid(row=0, column=0, sticky=W, padx=5, pady=5)
+        ttk.Label(master, text='Tile X').grid(row=1, column=0, sticky=W, padx=5, pady=5)
+        ttk.Label(master, text='X offset').grid(row=2, column=0, sticky=W, padx=5, pady=5)
+        ttk.Label(master, text='Tile Y').grid(row=3, column=0, sticky=W, padx=5, pady=5)
+        ttk.Label(master, text='Y offset').grid(row=4, column=0, sticky=W, padx=5, pady=5)
+        ttk.Label(master, text='Description').grid(row=5, column=0, sticky=W, padx=5, pady=5)
 
-        self.x_entry = Spinbox(master, from_=0, to=65535)
-        self.y_entry = Spinbox(master, from_=0, to=65535)
+        self.type_entry = Spinbox(master, from_=0, to=255)
+        self.tx_entry = Spinbox(master, from_=0, to=255)
+        self.sx_entry = Spinbox(master, from_=0, to=ctx.tile_width - 1)
+        self.ty_entry = Spinbox(master, from_=0, to=255)
+        self.sy_entry = Spinbox(master, from_=0, to=ctx.tile_height - 1)
         self.desc_entry = ttk.Entry(master)
 
-        self.x_entry.grid(row=0, column=1, sticky=EW)
-        self.y_entry.grid(row=1, column=1, sticky=EW)
-        self.desc_entry.grid(row=2, column=1, sticky=EW)
+        self.type_entry.grid(row=0, column=1, sticky=EW)
+        self.tx_entry.grid(row=1, column=1, sticky=EW)
+        self.sx_entry.grid(row=2, column=1, sticky=EW)
+        self.ty_entry.grid(row=3, column=1, sticky=EW)
+        self.sy_entry.grid(row=4, column=1, sticky=EW)
+        self.desc_entry.grid(row=5, column=1, sticky=EW)
 
         if self.defaults is not None:
-            self.x_entry.delete(0)
-            self.x_entry.insert(0, str(self.defaults[0]))
-            self.y_entry.delete(0)
-            self.y_entry.insert(0, str(self.defaults[1]))
-            self.desc_entry.insert(0, self.defaults[2])
+            self.type_entry.delete(0)
+            self.type_entry.insert(0, str(self.defaults[0]))
+            self.tx_entry.delete(0)
+            self.tx_entry.insert(0, str(self.defaults[1]))
+            self.sx_entry.delete(0)
+            self.sx_entry.insert(0, str(self.defaults[2]))
+            self.ty_entry.delete(0)
+            self.ty_entry.insert(0, str(self.defaults[3]))
+            self.sy_entry.delete(0)
+            self.sy_entry.insert(0, str(self.defaults[4]))
+            self.desc_entry.insert(0, self.defaults[5])
 
         vcmd = (master.register(validate_number), '%S')
-        self.x_entry.configure(validate='key', validatecommand=vcmd)
-        self.y_entry.configure(validate='key', validatecommand=vcmd)
+        self.type_entry.configure(validate='key', validatecommand=vcmd)
+        self.tx_entry.configure(validate='key', validatecommand=vcmd)
+        self.sx_entry.configure(validate='key', validatecommand=vcmd)
+        self.ty_entry.configure(validate='key', validatecommand=vcmd)
+        self.sy_entry.configure(validate='key', validatecommand=vcmd)
 
     def buttonbox(self):
         ttk.Button(self, text='OK', width=6, command=self.ok_pressed).pack(side=RIGHT, padx=5, pady=5)
@@ -729,8 +777,11 @@ class EntityDialog(simpledialog.Dialog):
 
     def ok_pressed(self):
         data = {
-            'x': int('0' + self.x_entry.get()),
-            'y': int('0' + self.y_entry.get()),
+            'type': int('0' + self.type_entry.get()),
+            'tx': int('0' + self.tx_entry.get()),
+            'sx': int('0' + self.sx_entry.get()),
+            'ty': int('0' + self.ty_entry.get()),
+            'sy': int('0' + self.sy_entry.get()),
             'desc': self.desc_entry.get(),
         }
         if validate_entity(data):
@@ -957,15 +1008,15 @@ class PropertiesDialog(simpledialog.Dialog):
         if new_size != ctx.entity_size:
             for entity in ctx.entities:
                 if new_size < ctx.entity_size:
-                    entity[3] = entity[3][:new_size]
+                    entity[6] = entity[6][:new_size]
                 else:
-                    entity[3] = entity[3] + [[0, ''] for x in range(new_size - ctx.entity_size)]
+                    entity[6] = entity[6] + [[0, ''] for x in range(new_size - ctx.entity_size)]
             ctx.entity_size = new_size
 
             ctx.entity_tree.delete(*ctx.entity_tree.get_children())
             ctx.entity_data_tree.delete(*ctx.entity_data_tree.get_children())
             for entity in ctx.entities:
-                ctx.entity_tree.insert('', END, values=(entity[0], entity[1], entity[2]))
+                ctx.entity_tree.insert('', END, values=tuple(entity[0:6]))
 
         refresh_ui()
         self.destroy()
@@ -976,10 +1027,10 @@ class PropertiesDialog(simpledialog.Dialog):
 def draw_entity(entity):
     width_scale = (2 if ctx.mode == 0 else 1) * ctx.zoom
     height_scale = (2 if ctx.mode == 2 else 1) * ctx.zoom
-    x = entity[0] * width_scale
-    y = entity[1] * height_scale
-    r = 4 * ctx.zoom
-    ctx.canvas.create_bitmap(x, y, background='red', foreground='white', bitmap='info', tags='entity')
+    x = ((entity[1] * ctx.tile_width) + entity[2]) * width_scale
+    y = ((entity[3] * ctx.tile_height) + entity[4]) * height_scale
+    ctx.canvas.create_bitmap(x + ctx.tile_width * width_scale * 0.5, y + ctx.tile_height * height_scale * 0.5, background='red', foreground='white', bitmap='info', tags='entity')
+    #r = 4 * ctx.zoom
     #ctx.canvas.create_oval(x-r, y-r, x+r, y+r, outline='#5073fc', fill='#50c8fc', width=ctx.zoom, tags='entity')
 
 def redraw_entities():
@@ -1397,9 +1448,12 @@ def export_binaries(root):
             if filename != '':
                 with open(filename, 'wb') as file:
                     for e in ctx.entities:
-                        file.write(struct.pack('<H', e[0])) # x
-                        file.write(struct.pack('<H', e[1])) # y
-                        for d in e[3]: # data
+                        file.write(e[0].to_bytes(1, 'little'))  # type
+                        file.write(e[1].to_bytes(1, 'little'))  # tx
+                        file.write(e[2].to_bytes(1, 'little'))  # sx
+                        file.write(e[3].to_bytes(1, 'little'))  # ty
+                        file.write(e[4].to_bytes(1, 'little'))  # sy
+                        for d in e[6]: # data
                             file.write(d[0].to_bytes(1, 'little'))
     
     if options['export_data']:
@@ -1413,7 +1467,7 @@ def export_binaries(root):
             if filename != '':
                 with open(filename, 'wb') as file:
                     for d in data:
-                        file.write(int(d[0]).to_bytes(1, 'little')) # id
+                        #file.write(int(d[0]).to_bytes(1, 'little')) # id
                         file.write(int(d[1]).to_bytes(1, 'little')) # value
     
     if options['export_palette']:
@@ -1642,17 +1696,23 @@ def main():
     ctx.set_cell_tag = lambda n, d: update_cell_tag(n, d, entry_text)
 
     # Entity list
-    ctx.entity_tree = ttk.Treeview(entity_page, columns=('x', 'y', 'desc'), show='headings', height=8)
-    ctx.entity_tree.heading('x', text='X')
-    ctx.entity_tree.heading('y', text='Y')
+    ctx.entity_tree = ttk.Treeview(entity_page, columns=('type', 'tx', 'sx', 'ty', 'sy', 'desc'), show='headings', height=8)
+    ctx.entity_tree.heading('type', text='Type')
+    ctx.entity_tree.heading('tx', text='TX')
+    ctx.entity_tree.heading('sx', text='SX')
+    ctx.entity_tree.heading('ty', text='TY')
+    ctx.entity_tree.heading('sy', text='SY')
     ctx.entity_tree.heading('desc', text='Description')
 
     # Calculate default font size for tables
     default_font = font.nametofont('TkDefaultFont')
     min_header_size = default_font.measure('NNNM')
 
-    ctx.entity_tree.column('x', width=min_header_size, stretch=False)
-    ctx.entity_tree.column('y', width=min_header_size, stretch=False)
+    ctx.entity_tree.column('type', width=min_header_size, stretch=False)
+    ctx.entity_tree.column('tx', width=min_header_size, stretch=False)
+    ctx.entity_tree.column('sx', width=min_header_size, stretch=False)
+    ctx.entity_tree.column('ty', width=min_header_size, stretch=False)
+    ctx.entity_tree.column('sy', width=min_header_size, stretch=False)
     ctx.entity_tree.column('desc', width=min_header_size, stretch=True)
     ctx.entity_tree.grid(row=0, column=0, columnspan=2, sticky=N+E+S+W)
     ctx.entity_tree.bind('<<TreeviewSelect>>', lambda e: select_entity())
