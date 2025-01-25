@@ -576,6 +576,28 @@ def apply_cell_tag_to_similar():
     if changed:
         adjust_zoom(0, True)
 
+
+def get_unique_cell_tags():
+    unique_tags = {}
+    for y in range(0, ctx.height):
+        for x in range(0, ctx.width):
+            i = x * ctx.height + y
+            tile = ctx.map[i]
+            if tile not in unique_tags or unique_tags[tile] == 0:
+                unique_tags[tile] = ctx.tags[i]
+    return unique_tags
+
+
+def dedupe_cell_tags():
+    unique_tags = get_unique_cell_tags()
+    for y in range(0, ctx.height):
+        for x in range(0, ctx.width):
+            i = x * ctx.height + y
+            ctx.tags[i] = unique_tags[ctx.map[i]]
+    if ctx.draw_tags:
+        redraw_map()
+
+
 def edit_entity_data(root):
     selection = ctx.entity_tree.selection()
     if len(selection) < 1:
@@ -1400,12 +1422,14 @@ class ExportBinaryDialog(simpledialog.Dialog):
         self.map_radios[1].grid(row=3, column=0, sticky=W)
         self.export_tiles = IntVar()
         ttk.Checkbutton(master, text='Export tiles', variable=self.export_tiles).grid(row=4, column=0, sticky=W)
+        self.export_tile_tags = IntVar()
+        ttk.Checkbutton(master, text='Export unique tags per tile', variable=self.export_tile_tags).grid(row=5, column=0, sticky=W)
         self.export_entities = IntVar()
-        ttk.Checkbutton(master, text='Export entities', variable=self.export_entities).grid(row=5, column=0, sticky=W)
+        ttk.Checkbutton(master, text='Export entities', variable=self.export_entities).grid(row=6, column=0, sticky=W)
         self.export_data = IntVar()
-        ttk.Checkbutton(master, text='Export data', variable=self.export_data).grid(row=6, column=0, sticky=W)
+        ttk.Checkbutton(master, text='Export data', variable=self.export_data).grid(row=7, column=0, sticky=W)
         self.export_palette = IntVar()
-        ttk.Checkbutton(master, text='Export palette', variable=self.export_palette).grid(row=7, column=0, sticky=W)
+        ttk.Checkbutton(master, text='Export palette', variable=self.export_palette).grid(row=8, column=0, sticky=W)
     
     def buttonbox(self):
         ttk.Button(self, text='OK', width=6, command=self.ok_pressed).pack(side=RIGHT, padx=5, pady=5)
@@ -1418,6 +1442,7 @@ class ExportBinaryDialog(simpledialog.Dialog):
             'export_tags': self.export_tags.get() == 1,
             'row_major': self.is_row_major.get() == 1,
             'export_tiles': self.export_tiles.get() == 1,
+            'export_tile_tags': self.export_tile_tags.get() == 1,
             'export_entities': self.export_entities.get() == 1,
             'export_data': self.export_data.get() == 1,
             'export_palette': self.export_palette.get() == 1,
@@ -1462,6 +1487,17 @@ def export_binaries(root):
                 with open(filename, 'wb') as file:
                     for tile in ctx.tiles:
                         file.write(tile)
+    
+    if options['export_tile_tags']:
+        if len(ctx.tiles) < 1:
+            messagebox.showinfo('Export binaries', 'No tiles to derive unique tags from')
+        else:
+            filename = filedialog.asksaveasfilename(title='Save tile tags binary', filetypes=filetypes, defaultextension='bin')
+            if filename != '':
+                with open(filename, 'wb') as file:
+                    unique_tags = get_unique_cell_tags()
+                    for i in range(len(ctx.tiles)):
+                        file.write(unique_tags[i].to_bytes(1, 'little'))
     
     if options['export_entities']:
         if len(ctx.entities) < 1:
@@ -1615,6 +1651,8 @@ def main():
     menu.add_command(label='Cut', underline=2, accelerator='Ctrl+X', command=lambda: copy(root, True))
     menu.add_command(label='Copy', underline=0, accelerator='Ctrl+C', command=lambda: copy(root))
     menu.add_command(label='Paste', underline=0, accelerator='Ctrl+V', command=lambda: paste(root))
+    menu.add_separator()
+    menu.add_command(label='De-dupe cell tags', underline=0, accelerator='Ctrl+D', command=lambda: dedupe_cell_tags())
 
     ctx.menu.add_cascade(label='Edit', menu=menu)
 
