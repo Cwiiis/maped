@@ -598,6 +598,18 @@ def dedupe_cell_tags():
         redraw_map()
 
 
+def remove_unused_tiles():
+    used_tiles = set(ctx.map)
+    for i in reversed(range(len(ctx.tiles))):
+        if i in used_tiles:
+            continue
+        del ctx.tiles[i]
+        for j in range(len(ctx.map)):
+            if ctx.map[j] > i:
+                ctx.map[j] -= 1
+    redraw_tiles()
+
+
 def edit_entity_data(root):
     selection = ctx.entity_tree.selection()
     if len(selection) < 1:
@@ -1653,6 +1665,7 @@ def main():
     menu.add_command(label='Paste', underline=0, accelerator='Ctrl+V', command=lambda: paste(root))
     menu.add_separator()
     menu.add_command(label='De-dupe cell tags', underline=0, accelerator='Ctrl+D', command=lambda: dedupe_cell_tags())
+    menu.add_command(label='Remove unused tiles', underline=0, accelerator='Ctrl+Shift+R', command=lambda: remove_unused_tiles())
 
     ctx.menu.add_cascade(label='Edit', menu=menu)
 
@@ -1690,6 +1703,8 @@ def main():
     root.bind('<Control-x>', lambda e: copy(root, True))
     root.bind('<Control-c>', lambda e: copy(root))
     root.bind('<Control-v>', lambda e: paste(root))
+    root.bind('<Control-d>', lambda e: dedupe_cell_tags())
+    root.bind('<Control-R>', lambda e: remove_unused_tiles())
 
     # Main window layout
     ctx.main_frame = ttk.Frame(root)
