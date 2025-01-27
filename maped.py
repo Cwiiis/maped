@@ -337,10 +337,14 @@ def canvas_motion(e):
     
     (x, y) = map_coords_from_event(e)
     i = entity_at_point(x, y)
+    tx = x // ctx.tile_width
+    sx = x % ctx.tile_width
+    ty = y // ctx.tile_height
+    sy = y % ctx.tile_height
     if i == -1:
-        ctx.status_right.set('(%d, %d)' % (x, y))
+        ctx.status_right.set('(%d-%d, %d-%d)' % (tx, sx, ty, sy))
     else:
-        ctx.status_right.set('%s (%d, %d)' % (ctx.entities[i][5], x, y))
+        ctx.status_right.set('%s (%d-%d, %d-%d)' % (ctx.entities[i][5], tx, sx, ty, sy))
 
 def canvas_release(e):
     i = tile_coords_from_coords(e)
