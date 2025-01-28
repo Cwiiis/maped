@@ -704,6 +704,14 @@ def select_entity():
     for datum in ctx.entities[i][6]:
         ctx.entity_data_tree.insert('', END, values=datum)
 
+def reorder_entity(direction):
+    for item in ctx.entity_tree.selection():
+        i = ctx.entity_tree.index(item)
+        if i + direction < 0 or i + direction >= len(ctx.entities):
+            continue
+        ctx.entity_tree.move(item, "", ctx.entity_tree.index(item) + direction)
+        ctx.entities[i], ctx.entities[i+direction] = ctx.entities[i+direction], ctx.entities[i]
+
 def remove_entity():
     for item in ctx.entity_tree.selection():
         i = ctx.entity_tree.index(item)
@@ -1794,35 +1802,41 @@ def main():
     ctx.entity_tree.column('ty', width=min_header_size, stretch=False)
     ctx.entity_tree.column('sy', width=min_header_size, stretch=False)
     ctx.entity_tree.column('desc', width=min_header_size, stretch=True)
-    ctx.entity_tree.grid(row=0, column=0, columnspan=2, sticky=N+E+S+W)
+    ctx.entity_tree.grid(row=0, column=0, columnspan=4, sticky=N+E+S+W)
     ctx.entity_tree.bind('<<TreeviewSelect>>', lambda e: select_entity())
     ctx.entity_tree.bind('<Double-1>', lambda e: edit_entity(root))
 
     scrollbar = ttk.Scrollbar(entity_page, orient=VERTICAL, command=ctx.entity_tree.yview)
     ctx.entity_tree.configure(yscroll=scrollbar.set)
-    scrollbar.grid(row=0, column=2, sticky=NS)
+    scrollbar.grid(row=0, column=4, sticky=NS)
 
     ctx.entity_data_tree = ttk.Treeview(entity_page, columns=('data', 'desc'), show='headings', height=3)
     ctx.entity_data_tree.heading('data', text='Data')
     ctx.entity_data_tree.heading('desc', text='Description')
     ctx.entity_data_tree.column('data', width=min_header_size, stretch=False)
     ctx.entity_data_tree.column('desc', width=min_header_size, stretch=True)
-    ctx.entity_data_tree.grid(row=1, column=0, columnspan=2, pady=5, sticky=N+E+S+W)
+    ctx.entity_data_tree.grid(row=1, column=0, columnspan=4, pady=5, sticky=N+E+S+W)
     ctx.entity_data_tree.bind('<Double-1>', lambda e: edit_entity_data(root))
 
     scrollbar = ttk.Scrollbar(entity_page, orient=VERTICAL, command=ctx.entity_data_tree.yview)
     ctx.entity_data_tree.configure(yscroll=scrollbar.set)
-    scrollbar.grid(row=1, column=2, sticky=NS)
+    scrollbar.grid(row=1, column=4, sticky=NS)
 
-    button = ttk.Button(entity_page, text='Remove', command=remove_entity)
+    button = ttk.Button(entity_page, text='Up', command=lambda : reorder_entity(-1))
     button.grid(column=0, row=2, sticky=SE)
+    button = ttk.Button(entity_page, text='Remove', command=remove_entity)
+    button.grid(column=1, row=2, sticky=S+E+W)
     button = ttk.Button(entity_page, text='Add', command=lambda : add_entity(root))
-    button.grid(column=1, row=2, sticky=SW)
+    button.grid(column=2, row=2, sticky=S+E+W)
+    button = ttk.Button(entity_page, text='Down', command=lambda : reorder_entity(1))
+    button.grid(column=3, row=2, sticky=SW)
 
     entity_page.grid_rowconfigure(0, weight=2)
     entity_page.grid_rowconfigure(1, weight=1)
     entity_page.grid_columnconfigure(0, weight=1)
     entity_page.grid_columnconfigure(1, weight=1)
+    entity_page.grid_columnconfigure(2, weight=1)
+    entity_page.grid_columnconfigure(3, weight=1)
 
     # Data
     ctx.data_tree = ttk.Treeview(data_page, columns=('id', 'data', 'desc'), show='headings', height=1)
