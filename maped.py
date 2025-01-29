@@ -612,6 +612,7 @@ def remove_unused_tiles():
             if ctx.map[j] > i:
                 ctx.map[j] -= 1
     redraw_tiles()
+    update_status()
 
 
 def edit_entity_data(root):
