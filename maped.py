@@ -1520,7 +1520,10 @@ def export_binaries(root):
                 with open(filename, 'wb') as file:
                     unique_tags = get_unique_cell_tags()
                     for i in range(len(ctx.tiles)):
-                        file.write(unique_tags[i].to_bytes(1, 'little'))
+                        if i in unique_tags:
+                            file.write(unique_tags[i].to_bytes(1, 'little'))
+                        else:
+                            file.write(b'\\x00')
     
     if options['export_entities']:
         if len(ctx.entities) < 1:
