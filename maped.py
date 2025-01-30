@@ -1921,6 +1921,9 @@ def main():
     ctx.main_frame.grid_columnconfigure(1, weight=1)
     ctx.main_frame.grid_columnconfigure(2, weight=0)
 
+    root.update()
+    main_pane.sashpos(0, 256)
+
     ctx.reset()
     refresh_ui()
     root.mainloop()
