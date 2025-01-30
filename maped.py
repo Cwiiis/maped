@@ -1395,34 +1395,32 @@ def import_tiles(root):
             ctx.palette.append('#000000')
 
     # Add new tiles (TODO: Share code with import_file)
-    new_tiles = []
+    new_tiles = collections.OrderedDict()
     for col in range(0, width, ctx.tile_width):
         for row in range(0, height, ctx.tile_height):
             tile = []
             for scanline in scanlines[row:row+ctx.tile_height]:
                 for offset in range(col, col+ctx.tile_width, pixels_per_byte):
                     tile.append(get_byte(scanline, offset, ctx.mode))
-            new_tiles.append(bytes(tile))
-    
-    for i in range(len(ctx.tiles)):
-        tile = ctx.tiles[i]
-        new_i = 0
+            tile = bytes(tile)
+            if tile not in new_tiles:
+                new_tiles[tile] = len(new_tiles)
+
+    for i in range(len(ctx.map)):
+        tile = ctx.tiles[ctx.map[i]]
         if tile in new_tiles:
-            new_i = new_tiles.index(tile)
+            ctx.map[i] = new_tiles[tile]
         else:
-            new_i = len(new_tiles)
-            new_tiles.append(tile)
-        for j in range(len(ctx.map)):
-            if ctx.map[j] == i:
-                ctx.map[j] = new_i
+            ctx.map[i] = len(new_tiles)
+            new_tiles[tile] = tile
     
-    ctx.tiles = new_tiles
+    ctx.tiles = list(new_tiles.keys())
     
     if len(ctx.map) != ctx.width * ctx.height:
         ctx.map = [0 for i in range(ctx.width * ctx.height)]
-        refresh_ui()
-    else:
-        redraw_tiles()
+
+    refresh_ui()
+
 
 class ExportBinaryDialog(simpledialog.Dialog):
     def __init__(self, parent):
